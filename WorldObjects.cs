@@ -71,6 +71,7 @@ namespace Assessment
             mesh.CopyAbsoluteBoneTransformsTo(transforms);
             visible = true;
         }
+
         public void Draw(camera3d cam, directionalLightSource light)
         {
             if (!visible) return; // dont render hidden meshes
@@ -78,16 +79,73 @@ namespace Assessment
              {
                 foreach (BasicEffect effect in mesh.Effects) // This loop then goes through every effect in each mesh.
                 {   
-                    effect.World = transforms[mesh.ParentBone.Index]; // begin dealing with transforms to render the object into the game world
-                                                                      // The following effects allow the object to be drawn in the correct place, with the correct rotation and scale.
-                                                                      ///////////////////////////////////////////////////////////////////
-                                                                      //
+                    effect.World = transforms[mesh.ParentBone.Index];
+                    // begin dealing with transforms to render the object into the game world
+                    // The following effects allow the object to be drawn in the correct place, with the correct rotation and scale.
 
+                    ///////////////////////////////////////////////////////////////////
+                    //
                     // CODE FOR TASK 1 SHOULD BE ENTERED HERE
                     //
                     ///////////////////////////////////////////////////////////////////
+
+                    // To render we need 3 things - world matrix, view matrix, and projection matrix
+                    // But we actually start in model space- this is where our world starts before transforms
+
+                    //-------------------
+                    // MESH BASE MATRIX
+                    //-------------------
+                    // Our meshes start with world - model space, so we use our transforms array
+                    effect.World = transforms[mesh.ParentBone.Index];
+
+                    //-------------------
+                    // WORLD MATRIX
+                    //-------------------
+                    // Transform from model space to world space in order - scael, rotation, translation.
+
+                    // Scale
+                    // Scale our model by multiplying the world matrix by a scale matrix
+                    // XNA does this for us using CreateScale()
+                    effect.World *= Matrix.CreateScale(scale);
+
+                    // Rotation
+                    // Rotate our model in the game world
+                    effect.World *= Matrix.CreateRotationX(rotation.X); // Rotate Around the x axis
+                    effect.World *= Matrix.CreateRotationY(rotation.Y); // Rotate Around the y axis
+                    effect.World *= Matrix.CreateRotationZ(rotation.Z); // Rotate Around the z axis
+
+                    // Translation
+                    // Move our model to the correct place in the game world
+                    effect.World *= Matrix.CreateTranslation(position);
+
+
+                    //-------------------
+                    // VIEW MATRIX
+                    //-------------------
+                    //This puts the model in relation to where our camera is, and in the direction of our camera
+                    effect.View = Matrix.CreateLookAt(
+                        cam.target,
+                        cam.target,
+                        Vector3.Up
+                        );
+
+                    //-------------------
+                    // PROJECTION MATRIX
+                    //-------------------
+                    //Projection changes from the view space (3D) to screen space
+                    // Can be either orthographic or perspective
+
+                    //Perspective
+                    effect.Projection = Matrix.CreatePerspectiveFieldOfView(
+                       cam.fieldOfView,
+                       cam.aspectRatio,
+                       cam.nearPlane,
+                       cam.farPlane);
+
+
                     // the following effects are related to lighting and texture  settings, feel free to tweak them to see what happens.
                     effect.LightingEnabled = true;
+                    
                     effect.Alpha = Alpha; //  amount of transparency
                     effect.AmbientLightColor = new Vector3(0.25f); // fills in dark areas with a small amount of light
                     effect.DiffuseColor = new Vector3(0.1f);
