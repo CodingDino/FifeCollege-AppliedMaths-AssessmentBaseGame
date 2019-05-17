@@ -31,6 +31,9 @@ namespace Assessment
         int doorSequenceTimer;
         int doorSequenceFinalTime = 2500;
 
+        float fallStart = 0;
+        float fallSpeed = 1;
+
         public Game1()
         {
             graphics = new GraphicsDeviceManager(this);
@@ -69,7 +72,7 @@ namespace Assessment
             BoundingRenderer.InitializeGraphics(graphics.GraphicsDevice);
             spriteBatch = new SpriteBatch(GraphicsDevice);
             player.LoadModel(Content, "Ship");
-            player.rotation = new Vector3(1.5f, 0f, 0f);
+            player.rotation = new Vector3(0f, 0f, 0f);
             player.position.X = 0;
             player.position.Y = 0;
             player.position.Z = 0;
@@ -120,11 +123,14 @@ namespace Assessment
 
                     break;
 
-                ///////////////////////////////////////////////////////////////////
-                //
-                // CODE FOR TASK 2 SHOULD BE ENTERED HERE
-                //
-                ///////////////////////////////////////////////////////////////////
+                    ///////////////////////////////////////////////////////////////////
+                    //
+                    // CODE FOR TASK 2 SHOULD BE ENTERED HERE
+                    //
+                    ///////////////////////////////////////////////////////////////////
+
+
+
                 case IntegrationMethod.LeapFrog:
                     break;
                 case IntegrationMethod.Verlet:
@@ -161,8 +167,8 @@ namespace Assessment
             player.velocity *= 0.9f; // friction
             if (Keyboard.GetState().IsKeyDown(Keys.Up))
             {
-                acceleration.X = (float)Math.Sin(player.rotation.Y) * 0.001f;
-                acceleration.Z = (float)Math.Cos(player.rotation.Y) * 0.001f;
+                acceleration.X = (float)Math.Sin(player.rotation.Y + Math.PI) * 0.001f;
+                acceleration.Z = (float)Math.Cos(player.rotation.Y + Math.PI) * 0.001f;
             }
             // camera follow
             gamecam.position = new Vector3(50, 50, 50) + player.position;
@@ -183,6 +189,7 @@ namespace Assessment
             {
                 rockFalling = true;
                 rock.velocity = new Vector3(0, 0.2f, 0);
+                fallStart = (float)gameTime.TotalGameTime.TotalSeconds;
             }
             if (rockFalling)
             {
@@ -192,6 +199,16 @@ namespace Assessment
                 // CODE FOR TASK 4 SHOULD BE ENTERED HERE
                 //
                 ///////////////////////////////////////////////////////////////////
+
+                float timeSincefall = (float)gameTime.TotalGameTime.TotalSeconds - fallStart;
+                rock.position.Y = (gravity * (timeSincefall * timeSincefall) / 2f) + fallSpeed * timeSincefall;
+                if (player.position.Y < 0f)
+                {
+                    player.position.Y = 0f;
+                    fallStart = 0f;
+                }
+
+
             }
             if (player.hitBox.Intersects(TriggerBoxDoorOpen))
             {

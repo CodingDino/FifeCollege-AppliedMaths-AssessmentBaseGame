@@ -48,6 +48,7 @@ namespace Assessment
         public Matrix[] transforms;
         public float Alpha = 1;
         public Vector3 collisionScale = Vector3.One;
+        public Vector3 collisionOffset = Vector3.Zero;
         public float scale = 1;
         public bool Lit = true;
         public Vector3 storedPos;
@@ -61,6 +62,22 @@ namespace Assessment
                 // CODE FOR TASK 3 SHOULD BE ENTERED HERE
                 //
                 ///////////////////////////////////////////////////////////////////
+
+                // find the center first by starting at the models world position
+                // then adding an offset if the models center also happens to be offset - scaled by the models scale
+                b.Min = position - mesh.Meshes[0].BoundingSphere.Center + collisionOffset;
+
+                // Then move this center to the top left corner by subtracting half thesize of the mesh
+                // Calculated by its radius and scaled by visual and collsion scales
+                b.Min.X -= (mesh.Meshes[0].BoundingSphere.Radius) * collisionScale.X * scale;
+                b.Min.Y -= (mesh.Meshes[0].BoundingSphere.Radius) * collisionScale.Y * scale;
+                b.Min.Z -= (mesh.Meshes[0].BoundingSphere.Radius) * collisionScale.Z * scale;
+
+                // Find the max (the opposite corner) by adding on the mesh size, scaled
+                b.Max.X = b.Min.X + mesh.Meshes[0].BoundingSphere.Radius * 2 * collisionScale.X * scale;
+                b.Max.Y = b.Min.Y + mesh.Meshes[0].BoundingSphere.Radius * 2 * collisionScale.Y * scale;
+                b.Max.Z = b.Min.Z + mesh.Meshes[0].BoundingSphere.Radius * 2 * collisionScale.Z * scale;
+
                 return b;
             }
         }
@@ -79,7 +96,7 @@ namespace Assessment
              {
                 foreach (BasicEffect effect in mesh.Effects) // This loop then goes through every effect in each mesh.
                 {   
-                    effect.World = transforms[mesh.ParentBone.Index];
+                    //effect.World = transforms[mesh.ParentBone.Index];
                     // begin dealing with transforms to render the object into the game world
                     // The following effects allow the object to be drawn in the correct place, with the correct rotation and scale.
 
@@ -118,13 +135,12 @@ namespace Assessment
                     // Move our model to the correct place in the game world
                     effect.World *= Matrix.CreateTranslation(position);
 
-
                     //-------------------
                     // VIEW MATRIX
                     //-------------------
                     //This puts the model in relation to where our camera is, and in the direction of our camera
                     effect.View = Matrix.CreateLookAt(
-                        cam.target,
+                        cam.position,
                         cam.target,
                         Vector3.Up
                         );
@@ -243,3 +259,5 @@ namespace Assessment
         }
     }
 }
+
+
