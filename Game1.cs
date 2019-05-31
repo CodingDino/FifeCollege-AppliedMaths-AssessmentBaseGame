@@ -28,8 +28,8 @@ namespace Assessment
         Vector3 acceleration = new Vector3();
         basicCuboid door;
         basicCuboid[] walls = new basicCuboid[20];
-        int doorSequenceTimer;
-        int doorSequenceFinalTime = 2500;
+        float doorSequenceTimer;
+        float doorSequenceFinalTime = 2500;
 
         float fallStart = 0;
         float fallSpeed = 1;
@@ -96,6 +96,7 @@ namespace Assessment
                 }
             }
 
+
             door = new basicCuboid(GraphicsDevice);
             door.LoadContent(Content, "WallTexture");
             door.scale = new Vector3(5, 30, 60);
@@ -128,11 +129,26 @@ namespace Assessment
                     // CODE FOR TASK 2 SHOULD BE ENTERED HERE
                     //
                     ///////////////////////////////////////////////////////////////////
-
-
+          
 
                 case IntegrationMethod.LeapFrog:
+                     
+                    Vector3 position_old = Vector3.Zero;
+                    Vector3 velocity_old = Vector3.Zero;
+
+                    //Velocity verlet (aka leapfrog) 
+                    // calculate velocity at half way through the fram, using LAST frames acceleration
+                    Vector3 velocity_half = velocity_old + acceleration_old * timeStep * 0.5f;
+
+                    // calculate position using this halfway velocity
+                    position = position_old + velocity_half * timeStep;
+
+                    // calculate the new velocity for this frame, using this frames acceleration and half a time step
+                    velocity = velocity_half + acceleration * timeStep * 0.5f;
+                    
+
                     break;
+
                 case IntegrationMethod.Verlet:
                     break;
             }
@@ -200,21 +216,13 @@ namespace Assessment
                 //
                 ///////////////////////////////////////////////////////////////////
 
-                float timeSincefall = (float)gameTime.TotalGameTime.TotalSeconds - fallStart;
-                rock.position.Y = (gravity * (timeSincefall * timeSincefall) / 2f) + fallSpeed * timeSincefall;
-                if (player.position.Y < 0f)
-                {
-                    player.position.Y = 0f;
-                    fallStart = 0f;
-                }
-
 
             }
             if (player.hitBox.Intersects(TriggerBoxDoorOpen))
             {
                 doorOpening = true;
             }
-            if (doorOpening)
+            if (doorOpening = true)
             {
                 Vector3 newPos = new Vector3();
                 Vector3 doorStartPoint = new Vector3(-70, 0, 0);
@@ -224,6 +232,20 @@ namespace Assessment
                 // CODE FOR TASK 5 SHOULD BE ENTERED HERE
                 //
                 ///////////////////////////////////////////////////////////////////
+
+
+                doorSequenceTimer += (float)gameTime.ElapsedGameTime.TotalSeconds;
+                if (doorSequenceTimer >= doorSequenceFinalTime)
+                {
+                    //We have finished our animation 
+                    // so restart it in the other direction
+                    doorSequenceTimer = 0f;
+                    Vector3 oldStart = doorStartPoint;
+                    Vector3 oldEnd = doorEndPoint;
+                    doorStartPoint = oldEnd;
+                    doorEndPoint = oldStart;
+                }
+                newPos = QuadEaseOut(doorSequenceTimer, doorSequenceFinalTime, doorStartPoint, doorEndPoint);
             }
 
 
@@ -232,13 +254,61 @@ namespace Assessment
 
         private void ElasticCollision(basicCuboid w)
         {
-            player.velocity *= -1;
-            player.position = player.storedPos;
+            //player.velocity *= -1;
+            //player.position = player.storedPos;
             ///////////////////////////////////////////////////////////////////
             //
             // CODE FOR TASK 7 SHOULD BE ENTERED HERE
             //
             ///////////////////////////////////////////////////////////////////
+
+            // Need the perpendicular vector to the face of the box we hit
+            // To do this we need 2 vectors on the face of the box we hit
+            Vector3 faceVector1;
+            Vector3 faceVector2;
+
+            // Get the corners of the box we hit so we can calculate the face vectors
+            Vector3[] corners = w.collisionbox.GetCorners();
+            // This returns the corners of the box faces that are perpendicular to the z axis
+            // 0-3 is the near face, 4-7 is the far face
+            // Start upper left, then upper right, then lower right, then lower left (clockwise)
+
+            // Move back our player so their previous position (so they aren't in the box)
+            player.position = player.storedPos;
+
+            // Is the players new position overlapping in the x direction
+            if (   (player.hitBox.Min.X - player.velocity.X) > w.collisionbox.Max.X 
+                || (player.hitBox.Max.X - player.velocity.X) < w.collisionbox.Min.X)
+            {
+                // Overlapping from right or left
+                // Line from back top right going to the front top right
+                faceVector1 = corners[1] - corners[6];
+                // Line from back bottom right going to the front bottom right
+                faceVector2 = corners[2] - corners[6];
+
+            }
+            // If we are not overlapping right or left, we are overlapping the front or back (z axis)
+            else
+            {
+                // Overlapping front or back
+                // Line from front top right going to the front top left
+                faceVector1 = corners[1] - corners[0];
+                // Line from front top left going to the front bottom right
+                faceVector2 = corners[2] - corners[0];
+            }
+            // we ignore the possibility of a y direction
+
+            // Get a cross product between these two vectors to define a normal perpendicular to the plane
+            Vector3 normal = Vector3.Cross(faceVector1, faceVector2);
+
+            // Make it a unit vector (length 1)
+            normal.Normalize();
+
+            // Use this normal vector to reflect the players velocity
+            // (this uses a dot product equation internally)
+
+            player.velocity = Vector3.Reflect(player.velocity, normal);
+
         }
         ///////////////////////////////////////////////////////////////////
         //
@@ -276,15 +346,44 @@ namespace Assessment
             gamecam.ProjectionMatrix(), Color.White);
             BoundingRenderer.RenderBox(TriggerBoxDoorOpen, gamecam.ViewMatrix(),
             gamecam.ProjectionMatrix(), player.hitBox.Intersects(TriggerBoxDoorOpen) ? Color.White
-            : Color.CornflowerBlue);
+            : Color.Green);
             BoundingRenderer.RenderBox(TriggerBoxRockFall, gamecam.ViewMatrix(),
             gamecam.ProjectionMatrix(), player.hitBox.Intersects(TriggerBoxRockFall) ? Color.White
-            : Color.CornflowerBlue);
+            : Color.Red);
             BoundingRenderer.RenderBox(door.collisionbox, gamecam.ViewMatrix(),
             gamecam.ProjectionMatrix(), player.hitBox.Intersects(TriggerBoxRockFall) ? Color.White
-            : Color.CornflowerBlue);
+            : Color.Black);
 
             base.Draw(gameTime);
+        }
+
+
+        // Ease out for door movement
+        private Vector3 QuadEaseOut(float time, float duration, Vector3 startPoint, Vector3 endPoint)
+        {
+            // caluculate our independant variable time as a proportion (ratio) of the time passed to the total duration
+            // (between 0 and 1)
+            float t = time / duration;
+
+            // Calculate p (position akaa distance traveled from start)
+            // Using our derived quadratic equation 
+            // Produces a fraction of the complete distance 
+            // This is our scaling factor
+            float p = -1f * t * t + 2f * t;
+
+            // Determine the total distance to be traveled 
+            Vector3 totalDistance = endPoint - startPoint;
+            // endpoint = startPoint + totalDistance
+
+            // Determine the duration traveled 
+            // By scaling the total distance by our generated scaling factor (p)
+            Vector3 distanceTraveled = totalDistance * p;
+
+            // Determine the new position by adding the distance traveled to the start point
+            Vector3 newPosition = startPoint + distanceTraveled;
+
+
+            return newPosition;
         }
     }
 }
