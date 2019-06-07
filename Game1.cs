@@ -31,8 +31,12 @@ namespace Assessment
         float doorSequenceTimer;
         float doorSequenceFinalTime = 2500;
 
+        Vector3 position_old = Vector3.Zero;
+        Vector3 position_older = Vector3.Zero;
+        Vector3 velocity_old = Vector3.Zero;
+        Vector3 acceleration_old = Vector3.Zero;
+
         float fallStart = 0;
-        float fallSpeed = 1;
 
         public Game1()
         {
@@ -119,8 +123,8 @@ namespace Assessment
             {
                 case IntegrationMethod.ForwardEuler:
                     //// This method is deprecated due to stability issues.
-                    player.position += player.velocity * dt;
-                    player.velocity += acceleration * dt;
+                   player.position += player.velocity * dt;
+                   player.velocity += acceleration * dt;
 
                     break;
 
@@ -132,26 +136,39 @@ namespace Assessment
           
 
                 case IntegrationMethod.LeapFrog:
-                     
-                    Vector3 position_old = Vector3.Zero;
-                    Vector3 velocity_old = Vector3.Zero;
 
                     //Velocity verlet (aka leapfrog) 
                     // calculate velocity at half way through the fram, using LAST frames acceleration
-                    Vector3 velocity_half = velocity_old + acceleration_old * timeStep * 0.5f;
+                    Vector3 velocity_half = velocity_old + acceleration_old * dt * 0.5f;
 
                     // calculate position using this halfway velocity
-                    position = position_old + velocity_half * timeStep;
+                    player.position = position_old + velocity_half * dt;
 
                     // calculate the new velocity for this frame, using this frames acceleration and half a time step
-                    velocity = velocity_half + acceleration * timeStep * 0.5f;
-                    
+                    player.velocity = velocity_half + acceleration * dt * 0.5f;
 
+                    // Apply an Overall drag (friction)
+                    player.velocity *= 0.9f;
                     break;
 
                 case IntegrationMethod.Verlet:
+
+                    // Update acceleration with drag
+                    if (position_older != position_old)
+                    {
+                        Vector3 drag = position_older - position_old;
+                        drag.Normalize();
+                        drag *= 0.0003f;
+                        acceleration += drag;
+                    }
+
+                    player.position = 2 * position_old - position_older + acceleration * dt * dt;
                     break;
             }
+            acceleration_old = acceleration;
+            velocity_old = player.velocity;
+            position_older = position_old;
+            position_old = player.position;
         }
 
 
@@ -204,25 +221,35 @@ namespace Assessment
             if (player.hitBox.Intersects(TriggerBoxRockFall) && !rockFalling)
             {
                 rockFalling = true;
-                rock.velocity = new Vector3(0, 0.2f, 0);
                 fallStart = (float)gameTime.TotalGameTime.TotalSeconds;
             }
             if (rockFalling)
             {
-                Vector3 gravity = new Vector3(0, -0.01f, 0);
+                Vector3 gravity = new Vector3(0f, 1f, 0);
+
                 ///////////////////////////////////////////////////////////////////
                 //
                 // CODE FOR TASK 4 SHOULD BE ENTERED HERE
                 //
                 ///////////////////////////////////////////////////////////////////
 
+                
+                Vector3 rockStartPos = new Vector3(25, 60, -50);
+                float timeSinceFall = (float)gameTime.TotalGameTime.TotalSeconds - fallStart;
+                rock.position.Y -= (gravity.Y * (timeSinceFall * timeSinceFall) / 2f) + rockStartPos.Y * timeSinceFall;
+
+                if (rock.position.Y < 0f)
+                {
+                    rock.position.Y = 0f;
+                    fallStart = 0f;
+                }
 
             }
             if (player.hitBox.Intersects(TriggerBoxDoorOpen))
             {
                 doorOpening = true;
             }
-            if (doorOpening = true)
+            if (doorOpening == true)
             {
                 Vector3 newPos = new Vector3();
                 Vector3 doorStartPoint = new Vector3(-70, 0, 0);
@@ -234,18 +261,15 @@ namespace Assessment
                 ///////////////////////////////////////////////////////////////////
 
 
-                doorSequenceTimer += (float)gameTime.ElapsedGameTime.TotalSeconds;
+                doorSequenceTimer += (float)gameTime.ElapsedGameTime.Milliseconds;
                 if (doorSequenceTimer >= doorSequenceFinalTime)
                 {
                     //We have finished our animation 
                     // so restart it in the other direction
-                    doorSequenceTimer = 0f;
-                    Vector3 oldStart = doorStartPoint;
-                    Vector3 oldEnd = doorEndPoint;
-                    doorStartPoint = oldEnd;
-                    doorEndPoint = oldStart;
+                    doorSequenceTimer = doorSequenceFinalTime;
                 }
-                newPos = QuadEaseOut(doorSequenceTimer, doorSequenceFinalTime, doorStartPoint, doorEndPoint);
+                newPos = QuadEaseOut((float)doorSequenceTimer,(float)doorSequenceFinalTime, doorStartPoint, doorEndPoint);
+                door.SetUpVertices(newPos);
             }
 
 
@@ -315,10 +339,33 @@ namespace Assessment
         // CODE FOR TASK 6 SHOULD BE ENTERED HERE
         //
         ///////////////////////////////////////////////////////////////////
-        public Vector3 CubicInterpolation(Vector3 initialPos, Vector3 endPos, float
-        time)
+
+        // Ease out for door movement
+        private Vector3 QuadEaseOut(float time, float duration, Vector3 startPoint, Vector3 endPoint)
         {
-            return new Vector3(0, 0, 0);
+            // caluculate our independant variable time as a proportion (ratio) of the time passed to the total duration
+            // (between 0 and 1)
+            float t = time / duration;
+
+            // Calculate p (position akaa distance traveled from start)
+            // Using our derived quadratic equation 
+            // Produces a fraction of the complete distance 
+            // This is our scaling factor
+            float p = -1f * t * t + 2f * t;
+
+            // Determine the total distance to be traveled 
+            Vector3 totalDistance = endPoint - startPoint;
+            // endpoint = startPoint + totalDistance
+
+            // Determine the duration traveled 
+            // By scaling the total distance by our generated scaling factor (p)
+            Vector3 distanceTraveled = totalDistance * p;
+
+            // Determine the new position by adding the distance traveled to the start point
+            Vector3 newPosition = startPoint + distanceTraveled;
+
+
+            return newPosition;
         }
 
         /// <summary>
@@ -358,32 +405,6 @@ namespace Assessment
         }
 
 
-        // Ease out for door movement
-        private Vector3 QuadEaseOut(float time, float duration, Vector3 startPoint, Vector3 endPoint)
-        {
-            // caluculate our independant variable time as a proportion (ratio) of the time passed to the total duration
-            // (between 0 and 1)
-            float t = time / duration;
 
-            // Calculate p (position akaa distance traveled from start)
-            // Using our derived quadratic equation 
-            // Produces a fraction of the complete distance 
-            // This is our scaling factor
-            float p = -1f * t * t + 2f * t;
-
-            // Determine the total distance to be traveled 
-            Vector3 totalDistance = endPoint - startPoint;
-            // endpoint = startPoint + totalDistance
-
-            // Determine the duration traveled 
-            // By scaling the total distance by our generated scaling factor (p)
-            Vector3 distanceTraveled = totalDistance * p;
-
-            // Determine the new position by adding the distance traveled to the start point
-            Vector3 newPosition = startPoint + distanceTraveled;
-
-
-            return newPosition;
-        }
     }
 }

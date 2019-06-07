@@ -118,7 +118,7 @@ namespace Assessment
                     //-------------------
                     // WORLD MATRIX
                     //-------------------
-                    // Transform from model space to world space in order - scael, rotation, translation.
+                    // Transform from model space to world space in order - scale, rotation, translation.
 
                     // Scale
                     // Scale our model by multiplying the world matrix by a scale matrix
